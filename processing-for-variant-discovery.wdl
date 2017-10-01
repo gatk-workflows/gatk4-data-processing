@@ -1,8 +1,8 @@
 ## Copyright Broad Institute, 2017
 ## 
 ## This WDL pipeline implements data pre-processing according to the GATK Best Practices 
-## (June 2016) for SNP and Indel discovery. Example JSONs are provided for the WGS 
-## use case but the workflow can be applied to Exomes and Targeted Panels.
+## (June 2016). Example JSONs are provided for the WGS use case but the workflow can be 
+## applied to Exomes and Targeted Panels.
 ##
 ## Requirements/expectations :
 ## - Pair-end sequencing data in unmapped BAM (uBAM) format
@@ -16,35 +16,255 @@
 ## Output :
 ## - A clean BAM file and its index, suitable for variant discovery analyses.
 ##
+## Software version requirements (see recommended dockers in inputs JSON)
+## - GATK 4.beta.3 or later
+## - Picard 2.x
+## - Samtools (see gotc docker)
+## - Python 2.7
+##
 ## Cromwell version support 
-## - Successfully tested on v25
+## - Successfully tested on v28
 ## - Does not work on versions < v23 due to output syntax
 ##
-## Runtime parameters are optimized for Broad's Google Cloud Platform implementation. 
-## For program versions, see docker containers. 
+## Runtime parameters are optimized for Broad's Google Cloud Platform implementation.
 ##
 ## LICENSING : 
 ## This script is released under the WDL source code license (BSD-3) (see LICENSE in 
 ## https://github.com/broadinstitute/wdl). Note however that the programs it calls may 
 ## be subject to different licenses. Users are responsible for checking that they are
-## authorized to run all programs before running this script. Please see the docker 
-## page at https://hub.docker.com/r/broadinstitute/genomes-in-the-cloud/ for detailed
-## licensing information pertaining to the included programs.
+## authorized to run all programs before running this script. Please see the dockers
+## for detailed licensing information pertaining to the included programs.
+
+# WORKFLOW DEFINITION 
+workflow PreProcessingForVariantDiscovery_GATK4 {
+
+  String sample_name
+  String ref_name
+
+  File flowcell_unmapped_bams_list
+  String unmapped_bam_suffix
+  
+  File ref_fasta
+  File ref_fasta_index
+  File ref_dict
+
+  String bwa_commandline
+  Int compression_level
+  
+  File dbSNP_vcf
+  File dbSNP_vcf_index
+  Array[File] known_indels_sites_VCFs
+  Array[File] known_indels_sites_indices
+
+  String gotc_docker
+  String picard_docker
+  String gatk_docker
+  String python_docker
+
+  String gotc_path
+  String picard_path
+  String gatk_launch_path
+  
+  Int flowcell_small_disk
+  Int flowcell_medium_disk
+  Int agg_small_disk
+  Int agg_medium_disk
+  Int agg_large_disk
+
+  Int preemptible_tries
+  Int agg_preemptible_tries
+
+  String base_file_name = sample_name + "." + ref_name
+
+  Array[File] flowcell_unmapped_bams = read_lines(flowcell_unmapped_bams_list)
+
+  # Get the version of BWA to include in the PG record in the header of the BAM produced 
+  # by MergeBamAlignment. 
+  call GetBwaVersion {
+    input: 
+      docker_image = gotc_docker,
+      bwa_path = gotc_path,
+      preemptible_tries = preemptible_tries
+  }
+
+  # Align flowcell-level unmapped input bams in parallel
+  scatter (unmapped_bam in flowcell_unmapped_bams) {
+
+    # Get the basename, i.e. strip the filepath and the extension
+    String bam_basename = basename(unmapped_bam, unmapped_bam_suffix)
+
+    # Map reads to reference
+    call SamToFastqAndBwaMem {
+      input:
+        input_bam = unmapped_bam,
+        bwa_commandline = bwa_commandline,
+        output_bam_basename = bam_basename + ".unmerged",
+        ref_fasta = ref_fasta,
+        ref_fasta_index = ref_fasta_index,
+        ref_dict = ref_dict,
+        docker_image = gotc_docker,
+        bwa_path = gotc_path,
+        picard_path = gotc_path,
+        disk_size = flowcell_medium_disk,
+        preemptible_tries = preemptible_tries,
+        compression_level = compression_level
+     }
+
+    # Merge original uBAM and BWA-aligned BAM 
+    call MergeBamAlignment {
+      input:
+        unmapped_bam = unmapped_bam,
+        bwa_commandline = bwa_commandline,
+        bwa_version = GetBwaVersion.version,
+        aligned_bam = SamToFastqAndBwaMem.output_bam,
+        output_bam_basename = bam_basename + ".aligned.unsorted",
+        ref_fasta = ref_fasta,
+        ref_fasta_index = ref_fasta_index,
+        ref_dict = ref_dict,
+        docker_image = picard_docker,
+        picard_path = picard_path,
+        disk_size = flowcell_medium_disk,
+        preemptible_tries = preemptible_tries,
+        compression_level = compression_level
+    }
+  }
+
+  # Aggregate aligned+merged flowcell BAM files and mark duplicates
+  # We take advantage of the tool's ability to take multiple BAM inputs and write out a single output
+  # to avoid having to spend time just merging BAM files.
+  call MarkDuplicates {
+    input:
+      input_bams = MergeBamAlignment.output_bam,
+      output_bam_basename = base_file_name + ".aligned.unsorted.duplicates_marked",
+      metrics_filename = base_file_name + ".duplicate_metrics",
+      docker_image = picard_docker,
+      picard_path = picard_path,
+      disk_size = agg_large_disk,
+      compression_level = compression_level,
+      preemptible_tries = agg_preemptible_tries
+  }
+
+  # Sort aggregated+deduped BAM file and fix tags
+  call SortAndFixTags {
+    input:
+      input_bam = MarkDuplicates.output_bam,
+      output_bam_basename = base_file_name + ".aligned.duplicate_marked.sorted",
+      ref_dict = ref_dict,
+      ref_fasta = ref_fasta,
+      ref_fasta_index = ref_fasta_index,
+      docker_image = picard_docker,
+      picard_path = picard_path,
+      disk_size = agg_large_disk,
+      preemptible_tries = 0,
+      compression_level = compression_level
+  }
+
+  # Create list of sequences for scatter-gather parallelization 
+  call CreateSequenceGroupingTSV {
+    input:
+      ref_dict = ref_dict,
+      docker_image = python_docker,
+      preemptible_tries = preemptible_tries
+  }
+  
+  # Perform Base Quality Score Recalibration (BQSR) on the sorted BAM in parallel
+  scatter (subgroup in CreateSequenceGroupingTSV.sequence_grouping) {
+    # Generate the recalibration model by interval
+    call BaseRecalibrator {
+      input:
+        input_bam = SortAndFixTags.output_bam,
+        input_bam_index = SortAndFixTags.output_bam_index,
+        recalibration_report_filename = base_file_name + ".recal_data.csv",
+        sequence_group_interval = subgroup,
+        dbSNP_vcf = dbSNP_vcf,
+        dbSNP_vcf_index = dbSNP_vcf_index,
+        known_indels_sites_VCFs = known_indels_sites_VCFs,
+        known_indels_sites_indices = known_indels_sites_indices,
+        ref_dict = ref_dict,
+        ref_fasta = ref_fasta,
+        ref_fasta_index = ref_fasta_index,
+        docker_image = gatk_docker,
+        gatk_launch_path = gatk_launch_path,
+        disk_size = agg_small_disk,
+        preemptible_tries = agg_preemptible_tries
+    }  
+  }  
+  
+  # Merge the recalibration reports resulting from by-interval recalibration
+  call GatherBqsrReports {
+    input:
+      input_bqsr_reports = BaseRecalibrator.recalibration_report,
+      output_report_filename = base_file_name + ".recal_data.csv",
+      docker_image = gatk_docker,
+      gatk_launch_path = gatk_launch_path,
+      disk_size = flowcell_small_disk,
+      preemptible_tries = preemptible_tries
+  }
+
+  scatter (subgroup in CreateSequenceGroupingTSV.sequence_grouping_with_unmapped) {
+
+    # Apply the recalibration model by interval
+    call ApplyBQSR {
+      input:
+        input_bam = SortAndFixTags.output_bam,
+        input_bam_index = SortAndFixTags.output_bam_index,
+        output_bam_basename = base_file_name + ".aligned.duplicates_marked.recalibrated",
+        recalibration_report = GatherBqsrReports.output_bqsr_report,
+        sequence_group_interval = subgroup,
+        ref_dict = ref_dict,
+        ref_fasta = ref_fasta,
+        ref_fasta_index = ref_fasta_index,
+        docker_image = gatk_docker,
+        gatk_launch_path = gatk_launch_path,
+        disk_size = agg_small_disk,
+        preemptible_tries = agg_preemptible_tries
+    }
+  } 
+
+  # Merge the recalibrated BAM files resulting from by-interval recalibration
+  call GatherBamFiles {
+    input:
+      input_bams = ApplyBQSR.recalibrated_bam,
+      output_bam_basename = base_file_name,
+      docker_image = picard_docker,
+      picard_path = picard_path,
+      disk_size = agg_large_disk,
+      preemptible_tries = agg_preemptible_tries,
+      compression_level = compression_level
+  }
+
+  # Outputs that will be retained when execution is complete  
+  output {
+    File duplication_metrics = MarkDuplicates.duplicate_metrics
+    File bqsr_report = GatherBqsrReports.output_bqsr_report
+    File analysis_ready_bam = GatherBamFiles.output_bam
+    File analysis_ready_bam_index = GatherBamFiles.output_bam_index
+    File analysis_ready_bam_md5 = GatherBamFiles.output_bam_md5
+  } 
+}
 
 # TASK DEFINITIONS
 
 # Get version of BWA
 task GetBwaVersion {
+  
+  Int preemptible_tries
+  String mem_size
+
+  String docker_image
+  String bwa_path
+
   command {
     # Not setting "set -o pipefail" here because /bwa has a rc=1 and we don't want to allow rc=1 to succeed 
     # because the sed may also fail with that error and that is something we actually want to fail on.
-    /usr/gitc/bwa 2>&1 | \
+    ${bwa_path}bwa 2>&1 | \
     grep -e '^Version' | \
     sed 's/Version: //'
   }
   runtime {
-    docker: "broadinstitute/genomes-in-the-cloud:2.2.5-1486412288"
-    memory: "1 GB"
+    preemptible: preemptible_tries
+    docker: docker_image
+    memory: mem_size
   }
   output {
     String version = read_string(stdout())
@@ -64,14 +284,22 @@ task SamToFastqAndBwaMem {
   # listing the reference contigs that are "alternative". Leave blank in JSON for legacy 
   # references such as b37 and hg19.
   File? ref_alt
-
   File ref_amb
   File ref_ann
   File ref_bwt
   File ref_pac
   File ref_sa
 
+  Int compression_level
+  Int preemptible_tries
   Int disk_size
+  String mem_size
+  String num_cpu
+
+  String docker_image
+  String bwa_path
+  String picard_path
+  String java_opt
 
   command <<<
     set -o pipefail
@@ -80,20 +308,23 @@ task SamToFastqAndBwaMem {
     # set the bash variable needed for the command-line
     bash_ref_fasta=${ref_fasta}
 
-  	java -Xmx3000m -jar /usr/gitc/picard.jar \
-    	SamToFastq \
+  	java -Dsamjdk.compression_level=${compression_level} ${java_opt} -jar ${picard_path}picard.jar \
+      SamToFastq \
     	INPUT=${input_bam} \
     	FASTQ=/dev/stdout \
     	INTERLEAVE=true \
-    	NON_PF=true | \
-  	/usr/gitc/${bwa_commandline} /dev/stdin -  2> >(tee ${output_bam_basename}.bwa.stderr.log >&2) | \
+    	NON_PF=true \
+    | \
+  	${bwa_path}${bwa_commandline} /dev/stdin -  2> >(tee ${output_bam_basename}.bwa.stderr.log >&2) \
+    | \
   	samtools view -1 - > ${output_bam_basename}.bam
 
   >>>
   runtime {
-    docker: "broadinstitute/genomes-in-the-cloud:2.2.5-1486412288"
-    memory: "14 GB"
-    cpu: "16"
+    preemptible: preemptible_tries
+    docker: docker_image
+    memory: mem_size
+    cpu: num_cpu
     disks: "local-disk " + disk_size + " HDD"
   }
   output {
@@ -113,12 +344,19 @@ task MergeBamAlignment {
   File ref_fasta_index
   File ref_dict
 
+  Int compression_level
+  Int preemptible_tries
   Int disk_size
+  String mem_size
+
+  String docker_image
+  String picard_path
+  String java_opt
 
   command {
     # set the bash variable needed for the command-line
     bash_ref_fasta=${ref_fasta}
-    java -Xmx2500m -jar /usr/gitc/picard.jar \
+    java -Dsamjdk.compression_level=${compression_level} ${java_opt} -jar ${picard_path}picard.jar \
       MergeBamAlignment \
       VALIDATION_STRINGENCY=SILENT \
       EXPECTED_ORIENTATIONS=FR \
@@ -145,9 +383,9 @@ task MergeBamAlignment {
       UNMAP_CONTAMINANT_READS=true
   }
   runtime {
-    docker: "broadinstitute/genomes-in-the-cloud:2.2.5-1486412288"
-    memory: "3500 MB"
-    cpu: "1"
+    preemptible: preemptible_tries
+    docker: docker_image
+    memory: mem_size
     disks: "local-disk " + disk_size + " HDD"
   }
   output {
@@ -162,31 +400,41 @@ task SortAndFixTags {
   File ref_dict
   File ref_fasta
   File ref_fasta_index
+  
+  Int compression_level
+  Int preemptible_tries
   Int disk_size
+  String mem_size
+
+  String docker_image
+  String picard_path
+  String java_opt_sort
+  String java_opt_fix
 
   command {
     set -o pipefail
 
-    java -Xmx4000m -jar /usr/gitc/picard.jar \
-    SortSam \
-    INPUT=${input_bam} \
-    OUTPUT=/dev/stdout \
-    SORT_ORDER="coordinate" \
-    CREATE_INDEX=false \
-    CREATE_MD5_FILE=false | \
-    java -Xmx500m -jar /usr/gitc/picard.jar \
-    SetNmAndUqTags \
-    INPUT=/dev/stdin \
-    OUTPUT=${output_bam_basename}.bam \
-    CREATE_INDEX=true \
-    CREATE_MD5_FILE=true \
-    REFERENCE_SEQUENCE=${ref_fasta}
+    java -Dsamjdk.compression_level=${compression_level} ${java_opt_sort} -jar ${picard_path}picard.jar \
+      SortSam \
+      INPUT=${input_bam} \
+      OUTPUT=/dev/stdout \
+      SORT_ORDER="coordinate" \
+      CREATE_INDEX=false \
+      CREATE_MD5_FILE=false \
+    | \
+    java -Dsamjdk.compression_level=${compression_level} ${java_opt_fix} -jar ${picard_path}picard.jar \
+      SetNmAndUqTags \
+      INPUT=/dev/stdin \
+      OUTPUT=${output_bam_basename}.bam \
+      CREATE_INDEX=true \
+      CREATE_MD5_FILE=true \
+      REFERENCE_SEQUENCE=${ref_fasta}
   }
   runtime {
-    docker: "broadinstitute/genomes-in-the-cloud:2.2.5-1486412288"
+    preemptible: preemptible_tries
+    docker: docker_image
+    memory: mem_size
     disks: "local-disk " + disk_size + " HDD"
-    cpu: "1"
-    memory: "5000 MB"
   }
   output {
     File output_bam = "${output_bam_basename}.bam"
@@ -200,13 +448,21 @@ task MarkDuplicates {
   Array[File] input_bams
   String output_bam_basename
   String metrics_filename
+  
+  Int compression_level
+  Int preemptible_tries
   Int disk_size
+  String mem_size
+
+  String docker_image
+  String picard_path
+  String java_opt
 
  # Task is assuming query-sorted input so that the Secondary and Supplementary reads get marked correctly.
  # This works because the output of BWA is query-grouped and therefore, so is the output of MergeBamAlignment.
  # While query-grouped isn't actually query-sorted, it's good enough for MarkDuplicates with ASSUME_SORT_ORDER="queryname"
   command {
-    java -Xmx4000m -jar /usr/gitc/picard.jar \
+    java -Dsamjdk.compression_level=${compression_level} ${java_opt} -jar ${picard_path}picard.jar \
       MarkDuplicates \
       INPUT=${sep=' INPUT=' input_bams} \
       OUTPUT=${output_bam_basename}.bam \
@@ -217,8 +473,9 @@ task MarkDuplicates {
       CREATE_MD5_FILE=true
   }
   runtime {
-    docker: "broadinstitute/genomes-in-the-cloud:2.2.5-1486412288"
-    memory: "7 GB"
+    preemptible: preemptible_tries
+    docker: docker_image
+    memory: mem_size
     disks: "local-disk " + disk_size + " HDD"
   }
   output {
@@ -229,7 +486,12 @@ task MarkDuplicates {
 
 # Generate sets of intervals for scatter-gathering over chromosomes
 task CreateSequenceGroupingTSV {
-  File ref_dict
+  File ref_dict  
+  
+  Int preemptible_tries
+  String mem_size
+
+  String docker_image
 
   # Use python to create the Sequencing Groupings used for BQSR and PrintReads Scatter. 
   # It outputs to stdout where it is parsed into a wdl Array[Array[String]]
@@ -271,8 +533,9 @@ task CreateSequenceGroupingTSV {
     CODE
   >>>
   runtime {
-    docker: "python:2.7"
-    memory: "2 GB"
+    preemptible: preemptible_tries
+    docker: docker_image
+    memory: mem_size
   }
   output {
     Array[Array[String]] sequence_grouping = read_tsv("sequence_grouping.txt")
@@ -293,23 +556,30 @@ task BaseRecalibrator {
   File ref_dict
   File ref_fasta
   File ref_fasta_index
+  
+  Int preemptible_tries
   Int disk_size
+  String mem_size
 
-  command { // 
-    java -Xmx4000m \
-      -jar /usr/gitc/GATK35.jar \
-      -T BaseRecalibrator \
+  String docker_image
+  String gatk_launch_path
+  String java_opt
+
+  command { 
+    ${gatk_launch_path}gatk-launch --javaOptions "${java_opt}" \
+      BaseRecalibrator \
       -R ${ref_fasta} \
       -I ${input_bam} \
       --useOriginalQualities \
-      -o ${recalibration_report_filename} \
+      -O ${recalibration_report_filename} \
       -knownSites ${dbSNP_vcf} \
       -knownSites ${sep=" -knownSites " known_indels_sites_VCFs} \
       -L ${sep=" -L " sequence_group_interval}
   }
   runtime {
-    docker: "broadinstitute/genomes-in-the-cloud:2.2.5-1486412288"
-    memory: "6 GB"
+    preemptible: preemptible_tries
+    docker: docker_image
+    memory: mem_size
     disks: "local-disk " + disk_size + " HDD"
   }
   output {
@@ -322,17 +592,25 @@ task BaseRecalibrator {
 task GatherBqsrReports {
   Array[File] input_bqsr_reports
   String output_report_filename
+
+  Int preemptible_tries
   Int disk_size
+  String mem_size
+
+  String docker_image
+  String gatk_launch_path
+  String java_opt
 
   command {
-    java -Xmx3000m \
-      -cp /usr/gitc/GATK35.jar org.broadinstitute.gatk.tools.GatherBqsrReports \
-      I= ${sep=' I= ' input_bqsr_reports} \
-      O= ${output_report_filename}
+    ${gatk_launch_path}gatk-launch --javaOptions "${java_opt}" \
+      GatherBQSRReports \
+      -I ${sep=' -I ' input_bqsr_reports} \
+      -O ${output_report_filename}
     }
   runtime {
-    docker: "broadinstitute/genomes-in-the-cloud:2.2.5-1486412288"
-    memory: "3500 MB"
+    preemptible: preemptible_tries
+    docker: docker_image
+    memory: mem_size
     disks: "local-disk " + disk_size + " HDD"
   }
   output {
@@ -350,23 +628,32 @@ task ApplyBQSR {
   File ref_dict
   File ref_fasta
   File ref_fasta_index
-  Int disk_size
+
+  Int preemptible_tries
+  Int disk_size 
+  String mem_size
+
+  String docker_image
+  String gatk_launch_path
+  String java_opt
 
   command {  
-    java -Xmx3000m \
-      -jar /usr/gitc/GATK35.jar \
-      -T PrintReads \
+    ${gatk_launch_path}gatk-launch --javaOptions "${java_opt}" \
+      ApplyBQSR \
       -R ${ref_fasta} \
       -I ${input_bam} \
-      --useOriginalQualities \
-      -o ${output_bam_basename}.bam \
-      -BQSR ${recalibration_report} \
+      -O ${output_bam_basename}.bam \
+      -L ${sep=" -L " sequence_group_interval} \
+      -bqsr ${recalibration_report} \
       -SQQ 10 -SQQ 20 -SQQ 30 \
-      -L ${sep=" -L " sequence_group_interval}
+      --useOriginalQualities \
+      --createOutputBamMD5 \
+      --addOutputSAMProgramRecord
   }
   runtime {
-    docker: "broadinstitute/genomes-in-the-cloud:2.2.5-1486412288"
-    memory: "3500 MB"
+    preemptible: preemptible_tries
+    docker: docker_image
+    memory: mem_size
     disks: "local-disk " + disk_size + " HDD"
   }
   output {
@@ -378,10 +665,18 @@ task ApplyBQSR {
 task GatherBamFiles {
   Array[File] input_bams
   String output_bam_basename
+
+  Int compression_level
+  Int preemptible_tries
   Int disk_size
+  String mem_size
+
+  String docker_image
+  String picard_path
+  String java_opt
 
   command {
-    java -Xmx2000m -jar /usr/gitc/picard.jar \
+    java -Dsamjdk.compression_level=${compression_level} ${java_opt} -jar ${picard_path}picard.jar \
       GatherBamFiles \
       INPUT=${sep=' INPUT=' input_bams} \
       OUTPUT=${output_bam_basename}.bam \
@@ -389,8 +684,9 @@ task GatherBamFiles {
       CREATE_MD5_FILE=true
     }
   runtime {
-    docker: "broadinstitute/genomes-in-the-cloud:2.2.5-1486412288"
-    memory: "3 GB"
+    preemptible: preemptible_tries
+    docker: docker_image
+    memory: mem_size
     disks: "local-disk " + disk_size + " HDD"
   }
   output {
@@ -400,184 +696,3 @@ task GatherBamFiles {
   }
 }
 
-# WORKFLOW DEFINITION 
-workflow GenericPreProcessingWorkflow {
-
-  String sample_name
-  String base_file_name
-  Array[File] flowcell_unmapped_bams
-  String unmapped_bam_suffix
-  
-  File ref_fasta
-  File ref_fasta_index
-  File ref_dict
-  File ref_alt
-  File ref_bwt
-  File ref_sa
-  File ref_amb
-  File ref_ann
-  File ref_pac
-  
-  File dbSNP_vcf
-  File dbSNP_vcf_index
-  Array[File] known_indels_sites_VCFs
-  Array[File] known_indels_sites_indices
-  
-  Int flowcell_small_disk
-  Int flowcell_medium_disk
-  Int agg_small_disk
-  Int agg_medium_disk
-  Int agg_large_disk
-
-  String bwa_commandline="bwa mem -K 100000000 -p -v 3 -t 16 -Y $bash_ref_fasta"
-
-  String recalibrated_bam_basename = base_file_name + ".aligned.duplicates_marked.recalibrated"
-
-  # Get the version of BWA to include in the PG record in the header of the BAM produced 
-  # by MergeBamAlignment. 
-  call GetBwaVersion
-
-  # Align flowcell-level unmapped input bams in parallel
-  scatter (unmapped_bam in flowcell_unmapped_bams) {
-  
-    # Because of a wdl/cromwell bug this is not currently valid so we have to sub(sub()) in each task
-    # String base_name = sub(sub(unmapped_bam, "gs://.*/", ""), unmapped_bam_suffix + "$", "")
-
-    String sub_strip_path = "gs://.*/"
-    String sub_strip_unmapped = unmapped_bam_suffix + "$"
-
-    # Map reads to reference
-    call SamToFastqAndBwaMem {
-      input:
-        input_bam = unmapped_bam,
-        bwa_commandline = bwa_commandline,
-        output_bam_basename = sub(sub(unmapped_bam, sub_strip_path, ""), sub_strip_unmapped, "") + ".unmerged",
-        ref_fasta = ref_fasta,
-        ref_fasta_index = ref_fasta_index,
-        ref_dict = ref_dict,
-        ref_alt = ref_alt,
-        ref_bwt = ref_bwt,
-        ref_amb = ref_amb,
-        ref_ann = ref_ann,
-        ref_pac = ref_pac,
-        ref_sa = ref_sa,
-        disk_size = flowcell_medium_disk
-     }
-
-    # Merge original uBAM and BWA-aligned BAM 
-    call MergeBamAlignment {
-      input:
-        unmapped_bam = unmapped_bam,
-        bwa_commandline = bwa_commandline,
-        bwa_version = GetBwaVersion.version,
-        aligned_bam = SamToFastqAndBwaMem.output_bam,
-        output_bam_basename = sub(sub(unmapped_bam, sub_strip_path, ""), sub_strip_unmapped, "") + ".aligned.unsorted",
-        ref_fasta = ref_fasta,
-        ref_fasta_index = ref_fasta_index,
-        ref_dict = ref_dict,
-        disk_size = flowcell_medium_disk
-    }
-
-    # Sort and fix tags in the merged BAM
-    call SortAndFixTags as SortAndFixReadGroupBam {
-      input:
-      input_bam = MergeBamAlignment.output_bam,
-      output_bam_basename = sub(sub(unmapped_bam, sub_strip_path, ""), sub_strip_unmapped, "") + ".sorted",
-      ref_dict = ref_dict,
-      ref_fasta = ref_fasta,
-      ref_fasta_index = ref_fasta_index,
-      disk_size = flowcell_medium_disk
-    }
-
-  }
-
-  # Aggregate aligned+merged flowcell BAM files and mark duplicates
-  # We take advantage of the tool's ability to take multiple BAM inputs and write out a single output
-  # to avoid having to spend time just merging BAM files.
-  call MarkDuplicates {
-    input:
-      input_bams = MergeBamAlignment.output_bam,
-      output_bam_basename = base_file_name + ".aligned.unsorted.duplicates_marked",
-      metrics_filename = base_file_name + ".duplicate_metrics",
-      disk_size = agg_large_disk
-  }
-
-  # Sort aggregated+deduped BAM file and fix tags
-  call SortAndFixTags as SortAndFixSampleBam {
-    input:
-      input_bam = MarkDuplicates.output_bam,
-      output_bam_basename = base_file_name + ".aligned.duplicate_marked.sorted",
-      ref_dict = ref_dict,
-      ref_fasta = ref_fasta,
-      ref_fasta_index = ref_fasta_index,
-      disk_size = agg_large_disk
-  }
-
-  # Create list of sequences for scatter-gather parallelization 
-  call CreateSequenceGroupingTSV {
-    input:
-      ref_dict = ref_dict
-  }
-  
-  # Perform Base Quality Score Recalibration (BQSR) on the sorted BAM in parallel
-  scatter (subgroup in CreateSequenceGroupingTSV.sequence_grouping) {
-    # Generate the recalibration model by interval
-    call BaseRecalibrator {
-      input:
-        input_bam = SortAndFixSampleBam.output_bam,
-        input_bam_index = SortAndFixSampleBam.output_bam_index,
-        recalibration_report_filename = base_file_name + ".recal_data.csv",
-        sequence_group_interval = subgroup,
-        dbSNP_vcf = dbSNP_vcf,
-        dbSNP_vcf_index = dbSNP_vcf_index,
-        known_indels_sites_VCFs = known_indels_sites_VCFs,
-        known_indels_sites_indices = known_indels_sites_indices,
-        ref_dict = ref_dict,
-        ref_fasta = ref_fasta,
-        ref_fasta_index = ref_fasta_index,
-        disk_size = agg_small_disk
-    }  
-  }  
-  
-  # Merge the recalibration reports resulting from by-interval recalibration
-  call GatherBqsrReports {
-    input:
-      input_bqsr_reports = BaseRecalibrator.recalibration_report,
-      output_report_filename = base_file_name + ".recal_data.csv",
-      disk_size = flowcell_small_disk
-  }
-
-  scatter (subgroup in CreateSequenceGroupingTSV.sequence_grouping_with_unmapped) {
-
-    # Apply the recalibration model by interval
-    call ApplyBQSR {
-      input:
-        input_bam = SortAndFixSampleBam.output_bam,
-        input_bam_index = SortAndFixSampleBam.output_bam_index,
-        output_bam_basename = recalibrated_bam_basename,
-        recalibration_report = GatherBqsrReports.output_bqsr_report,
-        sequence_group_interval = subgroup,
-        ref_dict = ref_dict,
-        ref_fasta = ref_fasta,
-        ref_fasta_index = ref_fasta_index,
-        disk_size = agg_small_disk
-    }
-  } 
-
-  # Merge the recalibrated BAM files resulting from by-interval recalibration
-  call GatherBamFiles {
-    input:
-      input_bams = ApplyBQSR.recalibrated_bam,
-      output_bam_basename = base_file_name,
-      disk_size = agg_large_disk
-  }
-
-  # Outputs that will be retained when execution is complete  
-  output {
-    File duplication_metrics = MarkDuplicates.duplicate_metrics
-    File bqsr_report = GatherBqsrReports.output_bqsr_report
-    File analysis_ready_bam = GatherBamFiles.output_bam
-    File analysis_ready_bam_index = GatherBamFiles.output_bam_index
-    File analysis_ready_bam_md5 = GatherBamFiles.output_bam_md5
-  } 
-}
