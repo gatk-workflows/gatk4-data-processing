@@ -31,7 +31,7 @@
   "PreProcessingForVariantDiscovery_GATK4.compression_level": 5,
   "PreProcessingForVariantDiscovery_GATK4.SamToFastqAndBwaMem.num_cpu": "16",
 
-  "##_COMMENT5": "DOCKERS (using gotc for picard now but will switch to picard-only docker when available)", 
+  "##_COMMENT5": "DOCKERS", 
   "PreProcessingForVariantDiscovery_GATK4.gotc_docker": "broadinstitute/genomes-in-the-cloud:2.3.0-1501082129",
   "PreProcessingForVariantDiscovery_GATK4.gatk_docker": "broadinstitute/gatk:4.beta.3",
   "PreProcessingForVariantDiscovery_GATK4.picard_docker": "broadinstitute/genomes-in-the-cloud:2.3.0-1501082129",
