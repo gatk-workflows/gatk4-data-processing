@@ -63,7 +63,7 @@ workflow PreProcessingForVariantDiscovery_GATK4 {
 
   String gotc_path
   String picard_path
-  String gatk_launch_path
+  String gatk_path
   
   Int flowcell_small_disk
   Int flowcell_medium_disk
@@ -184,7 +184,7 @@ workflow PreProcessingForVariantDiscovery_GATK4 {
         ref_fasta = ref_fasta,
         ref_fasta_index = ref_fasta_index,
         docker_image = gatk_docker,
-        gatk_launch_path = gatk_launch_path,
+        gatk_path = gatk_path,
         disk_size = agg_small_disk,
         preemptible_tries = agg_preemptible_tries
     }  
@@ -196,7 +196,7 @@ workflow PreProcessingForVariantDiscovery_GATK4 {
       input_bqsr_reports = BaseRecalibrator.recalibration_report,
       output_report_filename = base_file_name + ".recal_data.csv",
       docker_image = gatk_docker,
-      gatk_launch_path = gatk_launch_path,
+      gatk_path = gatk_path,
       disk_size = flowcell_small_disk,
       preemptible_tries = preemptible_tries
   }
@@ -215,7 +215,7 @@ workflow PreProcessingForVariantDiscovery_GATK4 {
         ref_fasta = ref_fasta,
         ref_fasta_index = ref_fasta_index,
         docker_image = gatk_docker,
-        gatk_launch_path = gatk_launch_path,
+        gatk_path = gatk_path,
         disk_size = agg_small_disk,
         preemptible_tries = agg_preemptible_tries
     }
@@ -308,16 +308,16 @@ task SamToFastqAndBwaMem {
     # set the bash variable needed for the command-line
     bash_ref_fasta=${ref_fasta}
 
-  	java -Dsamjdk.compression_level=${compression_level} ${java_opt} -jar ${picard_path}picard.jar \
+		java -Dsamjdk.compression_level=${compression_level} ${java_opt} -jar ${picard_path}picard.jar \
       SamToFastq \
-    	INPUT=${input_bam} \
-    	FASTQ=/dev/stdout \
-    	INTERLEAVE=true \
-    	NON_PF=true \
+			INPUT=${input_bam} \
+			FASTQ=/dev/stdout \
+			INTERLEAVE=true \
+			NON_PF=true \
     | \
-  	${bwa_path}${bwa_commandline} /dev/stdin -  2> >(tee ${output_bam_basename}.bwa.stderr.log >&2) \
+		${bwa_path}${bwa_commandline} /dev/stdin -  2> >(tee ${output_bam_basename}.bwa.stderr.log >&2) \
     | \
-  	samtools view -1 - > ${output_bam_basename}.bam
+		samtools view -1 - > ${output_bam_basename}.bam
 
   >>>
   runtime {
@@ -562,18 +562,18 @@ task BaseRecalibrator {
   String mem_size
 
   String docker_image
-  String gatk_launch_path
+  String gatk_path
   String java_opt
 
   command { 
-    ${gatk_launch_path}gatk-launch --javaOptions "${java_opt}" \
+    ${gatk_path} --java-options "${java_opt}" \
       BaseRecalibrator \
       -R ${ref_fasta} \
       -I ${input_bam} \
-      --useOriginalQualities \
+      --use-original-qualities \
       -O ${recalibration_report_filename} \
-      -knownSites ${dbSNP_vcf} \
-      -knownSites ${sep=" -knownSites " known_indels_sites_VCFs} \
+      --known-sites ${dbSNP_vcf} \
+      --known-sites ${sep=" --known-sites " known_indels_sites_VCFs} \
       -L ${sep=" -L " sequence_group_interval}
   }
   runtime {
@@ -598,11 +598,11 @@ task GatherBqsrReports {
   String mem_size
 
   String docker_image
-  String gatk_launch_path
+  String gatk_path
   String java_opt
 
   command {
-    ${gatk_launch_path}gatk-launch --javaOptions "${java_opt}" \
+    ${gatk_path} --java-options "${java_opt}" \
       GatherBQSRReports \
       -I ${sep=' -I ' input_bqsr_reports} \
       -O ${output_report_filename}
@@ -634,21 +634,21 @@ task ApplyBQSR {
   String mem_size
 
   String docker_image
-  String gatk_launch_path
+  String gatk_path
   String java_opt
 
   command {  
-    ${gatk_launch_path}gatk-launch --javaOptions "${java_opt}" \
+    ${gatk_path} --java-options "${java_opt}" \
       ApplyBQSR \
       -R ${ref_fasta} \
       -I ${input_bam} \
       -O ${output_bam_basename}.bam \
       -L ${sep=" -L " sequence_group_interval} \
       -bqsr ${recalibration_report} \
-      -SQQ 10 -SQQ 20 -SQQ 30 \
-      --useOriginalQualities \
-      --createOutputBamMD5 \
-      --addOutputSAMProgramRecord
+      --static-quantized-quals 10 --static-quantized-quals 20 --static-quantized-quals 30 \
+      --add-output-sam-program-record \
+      --create-output-bam-md5 \
+      --use-original-qualities
   }
   runtime {
     preemptible: preemptible_tries
