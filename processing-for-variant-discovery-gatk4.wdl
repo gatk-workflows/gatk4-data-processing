@@ -17,13 +17,13 @@
 ## - A clean BAM file and its index, suitable for variant discovery analyses.
 ##
 ## Software version requirements (see recommended dockers in inputs JSON)
-## - GATK 4.beta.3 or later
-## - Picard 2.x
+## - GATK 4 or later
+## - Picard (see gotc docker)
 ## - Samtools (see gotc docker)
 ## - Python 2.7
 ##
 ## Cromwell version support 
-## - Successfully tested on v28
+## - Successfully tested on v32
 ## - Does not work on versions < v23 due to output syntax
 ##
 ## Runtime parameters are optimized for Broad's Google Cloud Platform implementation.
@@ -57,12 +57,10 @@ workflow PreProcessingForVariantDiscovery_GATK4 {
   Array[File] known_indels_sites_indices
 
   String gotc_docker
-  String picard_docker
   String gatk_docker
   String python_docker
 
   String gotc_path
-  String picard_path
   String gatk_path
   
   Int flowcell_small_disk
@@ -104,7 +102,7 @@ workflow PreProcessingForVariantDiscovery_GATK4 {
         ref_dict = ref_dict,
         docker_image = gotc_docker,
         bwa_path = gotc_path,
-        picard_path = gotc_path,
+        gotc_path = gotc_path,
         disk_size = flowcell_medium_disk,
         preemptible_tries = preemptible_tries,
         compression_level = compression_level
@@ -121,8 +119,8 @@ workflow PreProcessingForVariantDiscovery_GATK4 {
         ref_fasta = ref_fasta,
         ref_fasta_index = ref_fasta_index,
         ref_dict = ref_dict,
-        docker_image = picard_docker,
-        picard_path = picard_path,
+        docker_image = gatk_docker,
+        gatk_path = gatk_path,
         disk_size = flowcell_medium_disk,
         preemptible_tries = preemptible_tries,
         compression_level = compression_level
@@ -137,8 +135,8 @@ workflow PreProcessingForVariantDiscovery_GATK4 {
       input_bams = MergeBamAlignment.output_bam,
       output_bam_basename = base_file_name + ".aligned.unsorted.duplicates_marked",
       metrics_filename = base_file_name + ".duplicate_metrics",
-      docker_image = picard_docker,
-      picard_path = picard_path,
+      docker_image = gatk_docker,
+      gatk_path = gatk_path,
       disk_size = agg_large_disk,
       compression_level = compression_level,
       preemptible_tries = agg_preemptible_tries
@@ -152,8 +150,8 @@ workflow PreProcessingForVariantDiscovery_GATK4 {
       ref_dict = ref_dict,
       ref_fasta = ref_fasta,
       ref_fasta_index = ref_fasta_index,
-      docker_image = picard_docker,
-      picard_path = picard_path,
+      docker_image = gatk_docker,
+      gatk_path = gatk_path,
       disk_size = agg_large_disk,
       preemptible_tries = 0,
       compression_level = compression_level
@@ -226,8 +224,8 @@ workflow PreProcessingForVariantDiscovery_GATK4 {
     input:
       input_bams = ApplyBQSR.recalibrated_bam,
       output_bam_basename = base_file_name,
-      docker_image = picard_docker,
-      picard_path = picard_path,
+      docker_image = gatk_docker,
+      gatk_path = gatk_path,
       disk_size = agg_large_disk,
       preemptible_tries = agg_preemptible_tries,
       compression_level = compression_level
@@ -298,7 +296,7 @@ task SamToFastqAndBwaMem {
 
   String docker_image
   String bwa_path
-  String picard_path
+  String gotc_path
   String java_opt
 
   command <<<
@@ -308,7 +306,7 @@ task SamToFastqAndBwaMem {
     # set the bash variable needed for the command-line
     bash_ref_fasta=${ref_fasta}
 
-		java -Dsamjdk.compression_level=${compression_level} ${java_opt} -jar ${picard_path}picard.jar \
+		java -Dsamjdk.compression_level=${compression_level} ${java_opt} -jar ${gotc_path}picard.jar \
       SamToFastq \
 			INPUT=${input_bam} \
 			FASTQ=/dev/stdout \
@@ -350,37 +348,37 @@ task MergeBamAlignment {
   String mem_size
 
   String docker_image
-  String picard_path
+  String gatk_path
   String java_opt
 
   command {
     # set the bash variable needed for the command-line
     bash_ref_fasta=${ref_fasta}
-    java -Dsamjdk.compression_level=${compression_level} ${java_opt} -jar ${picard_path}picard.jar \
+    ${gatk_path} --java-options "-Dsamjdk.compression_level=${compression_level} ${java_opt}" \
       MergeBamAlignment \
-      VALIDATION_STRINGENCY=SILENT \
-      EXPECTED_ORIENTATIONS=FR \
-      ATTRIBUTES_TO_RETAIN=X0 \
-      ALIGNED_BAM=${aligned_bam} \
-      UNMAPPED_BAM=${unmapped_bam} \
-      OUTPUT=${output_bam_basename}.bam \
-      REFERENCE_SEQUENCE=${ref_fasta} \
-      PAIRED_RUN=true \
-      SORT_ORDER="unsorted" \
-      IS_BISULFITE_SEQUENCE=false \
-      ALIGNED_READS_ONLY=false \
-      CLIP_ADAPTERS=false \
-      MAX_RECORDS_IN_RAM=2000000 \
-      ADD_MATE_CIGAR=true \
-      MAX_INSERTIONS_OR_DELETIONS=-1 \
-      PRIMARY_ALIGNMENT_STRATEGY=MostDistant \
-      PROGRAM_RECORD_ID="bwamem" \
-      PROGRAM_GROUP_VERSION="${bwa_version}" \
-      PROGRAM_GROUP_COMMAND_LINE="${bwa_commandline}" \
-      PROGRAM_GROUP_NAME="bwamem" \
-      UNMAPPED_READ_STRATEGY=COPY_TO_TAG \
-      ALIGNER_PROPER_PAIR_FLAGS=true \
-      UNMAP_CONTAMINANT_READS=true
+      --VALIDATION_STRINGENCY SILENT \
+      --EXPECTED_ORIENTATIONS FR \
+      --ATTRIBUTES_TO_RETAIN X0 \
+      --ALIGNED_BAM ${aligned_bam} \
+      --UNMAPPED_BAM ${unmapped_bam} \
+      --OUTPUT ${output_bam_basename}.bam \
+      --REFERENCE_SEQUENCE ${ref_fasta} \
+      --PAIRED_RUN true \
+      --SORT_ORDER "unsorted" \
+      --IS_BISULFITE_SEQUENCE false \
+      --ALIGNED_READS_ONLY false \
+      --CLIP_ADAPTERS false \
+      --MAX_RECORDS_IN_RAM 2000000 \
+      --ADD_MATE_CIGAR true \
+      --MAX_INSERTIONS_OR_DELETIONS -1 \
+      --PRIMARY_ALIGNMENT_STRATEGY MostDistant \
+      --PROGRAM_RECORD_ID "bwamem" \
+      --PROGRAM_GROUP_VERSION "${bwa_version}" \
+      --PROGRAM_GROUP_COMMAND_LINE "${bwa_commandline}" \
+      --PROGRAM_GROUP_NAME "bwamem" \
+      --UNMAPPED_READ_STRATEGY COPY_TO_TAG \
+      --ALIGNER_PROPER_PAIR_FLAGS true \
+      --UNMAP_CONTAMINANT_READS true
   }
   runtime {
     preemptible: preemptible_tries
@@ -407,28 +405,28 @@ task SortAndFixTags {
   String mem_size
 
   String docker_image
-  String picard_path
+  String gatk_path
   String java_opt_sort
   String java_opt_fix
 
   command {
     set -o pipefail
 
-    java -Dsamjdk.compression_level=${compression_level} ${java_opt_sort} -jar ${picard_path}picard.jar \
+    ${gatk_path} --java-options "-Dsamjdk.compression_level=${compression_level} ${java_opt_sort}" \
       SortSam \
-      INPUT=${input_bam} \
-      OUTPUT=/dev/stdout \
-      SORT_ORDER="coordinate" \
-      CREATE_INDEX=false \
-      CREATE_MD5_FILE=false \
+      --INPUT ${input_bam} \
+      --OUTPUT /dev/stdout \
+      --SORT_ORDER "coordinate" \
+      --CREATE_INDEX false \
+      --CREATE_MD5_FILE false \
     | \
-    java -Dsamjdk.compression_level=${compression_level} ${java_opt_fix} -jar ${picard_path}picard.jar \
+    ${gatk_path} --java-options "-Dsamjdk.compression_level=${compression_level} ${java_opt_fix}" \
       SetNmAndUqTags \
-      INPUT=/dev/stdin \
-      OUTPUT=${output_bam_basename}.bam \
-      CREATE_INDEX=true \
-      CREATE_MD5_FILE=true \
-      REFERENCE_SEQUENCE=${ref_fasta}
+      --INPUT /dev/stdin \
+      --OUTPUT ${output_bam_basename}.bam \
+      --CREATE_INDEX true \
+      --CREATE_MD5_FILE true \
+      --REFERENCE_SEQUENCE ${ref_fasta}
   }
   runtime {
     preemptible: preemptible_tries
@@ -455,22 +453,22 @@ task MarkDuplicates {
   String mem_size
 
   String docker_image
-  String picard_path
+  String gatk_path
   String java_opt
 
  # Task is assuming query-sorted input so that the Secondary and Supplementary reads get marked correctly.
  # This works because the output of BWA is query-grouped and therefore, so is the output of MergeBamAlignment.
  # While query-grouped isn't actually query-sorted, it's good enough for MarkDuplicates with ASSUME_SORT_ORDER="queryname"
   command {
-    java -Dsamjdk.compression_level=${compression_level} ${java_opt} -jar ${picard_path}picard.jar \
+    ${gatk_path} --java-options "-Dsamjdk.compression_level=${compression_level} ${java_opt}" \
       MarkDuplicates \
-      INPUT=${sep=' INPUT=' input_bams} \
-      OUTPUT=${output_bam_basename}.bam \
-      METRICS_FILE=${metrics_filename} \
-      VALIDATION_STRINGENCY=SILENT \
-      OPTICAL_DUPLICATE_PIXEL_DISTANCE=2500 \
-      ASSUME_SORT_ORDER="queryname"
-      CREATE_MD5_FILE=true
+      --INPUT ${sep=' --INPUT ' input_bams} \
+      --OUTPUT ${output_bam_basename}.bam \
+      --METRICS_FILE ${metrics_filename} \
+      --VALIDATION_STRINGENCY SILENT \
+      --OPTICAL_DUPLICATE_PIXEL_DISTANCE 2500 \
+      --ASSUME_SORT_ORDER "queryname" \
+      --CREATE_MD5_FILE true
   }
   runtime {
     preemptible: preemptible_tries
@@ -672,16 +670,16 @@ task GatherBamFiles {
   String mem_size
 
   String docker_image
-  String picard_path
+  String gatk_path
   String java_opt
 
   command {
-    java -Dsamjdk.compression_level=${compression_level} ${java_opt} -jar ${picard_path}picard.jar \
+    ${gatk_path} --java-options "-Dsamjdk.compression_level=${compression_level} ${java_opt}" \
       GatherBamFiles \
-      INPUT=${sep=' INPUT=' input_bams} \
-      OUTPUT=${output_bam_basename}.bam \
-      CREATE_INDEX=true \
-      CREATE_MD5_FILE=true
+      --INPUT ${sep=' --INPUT ' input_bams} \
+      --OUTPUT ${output_bam_basename}.bam \
+      --CREATE_INDEX true \
+      --CREATE_MD5_FILE true
     }
   runtime {
     preemptible: preemptible_tries
