@@ -21,13 +21,13 @@ applied to Exomes and Targeted Panels.
 - A clean BAM file and its index, suitable for variant discovery analyses.
 
 ### Software version requirements :
-- GATK 4.beta.3 or later
+- GATK 4 or later
 - Picard 2.x
 - Samtools (see gotc docker)
 - Python 2.7
 
 Cromwell version support 
- - Successfully tested on v28
+ - Successfully tested on v32
  - Does not work on versions < v23 due to output syntax
 
 Runtime parameters are optimized for Broad's Google Cloud Platform implementation.
