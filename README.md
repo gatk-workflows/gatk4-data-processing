@@ -5,8 +5,7 @@ Workflows for processing high-throughput sequencing data for variant discovery w
 
 ### processing-for-variant-discovery-gatk4 :
 The processing-for-variant-discovery-gatk4 WDL pipeline implements data pre-processing according to the GATK Best Practices 
-(June 2016). Example JSONs are provided for the WGS use case but the workflow can be 
-applied to Exomes and Targeted Panels.
+(June 2016).  
 
 #### Requirements/expectations 
 - Pair-end sequencing data in unmapped BAM (uBAM) format
