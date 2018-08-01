@@ -1,8 +1,7 @@
-## Copyright Broad Institute, 2017
+## Copyright Broad Institute, 2018
 ## 
 ## This WDL pipeline implements data pre-processing according to the GATK Best Practices 
-## (June 2016). Example JSONs are provided for the WGS use case but the workflow can be 
-## applied to Exomes and Targeted Panels.
+## (June 2016).  
 ##
 ## Requirements/expectations :
 ## - Pair-end sequencing data in unmapped BAM (uBAM) format
