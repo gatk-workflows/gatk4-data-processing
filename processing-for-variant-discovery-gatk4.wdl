@@ -1,7 +1,6 @@
-## Copyright Broad Institute, 2018
+## Copyright Broad Institute, 2019
 ## 
-## This WDL pipeline implements data pre-processing according to the GATK Best Practices 
-## (June 2016).  
+## This WDL pipeline implements data pre-processing according to the GATK Best Practices.  
 ##
 ## Requirements/expectations :
 ## - Pair-end sequencing data in unmapped BAM (uBAM) format
@@ -22,7 +21,7 @@
 ## - Python 2.7
 ##
 ## Cromwell version support 
-## - Successfully tested on v32
+## - Successfully tested on v37
 ## - Does not work on versions < v23 due to output syntax
 ##
 ## Runtime parameters are optimized for Broad's Google Cloud Platform implementation.
