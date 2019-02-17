@@ -419,7 +419,7 @@ task SortAndFixTags {
       --CREATE_MD5_FILE false \
     | \
     ${gatk_path} --java-options "-Dsamjdk.compression_level=${compression_level} ${java_opt_fix}" \
-      SetNmAndUqTags \
+      SetNmMdAndUqTags \
       --INPUT /dev/stdin \
       --OUTPUT ${output_bam_basename}.bam \
       --CREATE_INDEX true \
