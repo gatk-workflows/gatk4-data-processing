@@ -29,18 +29,18 @@
   ],
 
   "##_COMMENT4": "MISC PARAMETERS", 
-  "PreProcessingForVariantDiscovery_GATK4.bwa_commandline": "bwa mem -K 100000000 -p -v 3 -t 16 -Y $bash_ref_fasta",
+  "#PreProcessingForVariantDiscovery_GATK4.bwa_commandline_override": "String? (optional)",
   "PreProcessingForVariantDiscovery_GATK4.compression_level": 5,
   "PreProcessingForVariantDiscovery_GATK4.SamToFastqAndBwaMem.num_cpu": "16",
 
   "##_COMMENT5": "DOCKERS", 
-  "PreProcessingForVariantDiscovery_GATK4.gotc_docker": "broadinstitute/genomes-in-the-cloud:2.3.1-1512499786",
-  "PreProcessingForVariantDiscovery_GATK4.gatk_docker": "broadinstitute/gatk:4.0.4.0",
-  "PreProcessingForVariantDiscovery_GATK4.python_docker": "python:2.7",
+  "#PreProcessingForVariantDiscovery_GATK4.gotc_docker_override": "String? (optional)",
+  "#PreProcessingForVariantDiscovery_GATK4.gatk_docker_override": "String? (optional)",
+  "#PreProcessingForVariantDiscovery_GATK4.python_docker_override": "String? (optional)",
 
   "##_COMMENT6": "PATHS",   
-  "PreProcessingForVariantDiscovery_GATK4.gotc_path": "/usr/gitc/",
-  "PreProcessingForVariantDiscovery_GATK4.gatk_path": "/gatk/gatk",
+  "#PreProcessingForVariantDiscovery_GATK4.gotc_path_override": "String? (optional)",
+  "#PreProcessingForVariantDiscovery_GATK4.gatk_path_override": "String? (optional)",
 
   "##_COMMENT7": "JAVA OPTIONS", 
   "PreProcessingForVariantDiscovery_GATK4.SamToFastqAndBwaMem.java_opt": "-Xms3000m",
@@ -73,6 +73,5 @@
   "PreProcessingForVariantDiscovery_GATK4.flowcell_medium_disk": 200,
 
   "##_COMMENT10": "PREEMPTIBLES", 
-  "PreProcessingForVariantDiscovery_GATK4.preemptible_tries": 3,
-  "PreProcessingForVariantDiscovery_GATK4.agg_preemptible_tries": 3
+  "#PreProcessingForVariantDiscovery_GATK4.preemptible_tries_override": "Int? (optional)"
 }
