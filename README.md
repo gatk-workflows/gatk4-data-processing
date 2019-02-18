@@ -14,6 +14,7 @@ The processing-for-variant-discovery-gatk4 WDL pipeline implements data pre-proc
   - files must pass validation by ValidateSamFile 
   - reads are provided in query-sorted order
   - all reads must have an RG tag
+- Reference index files must be in the same directory as source (e.g. reference.fasta_index in the same directory as reference.fasta)
 
 #### Outputs : 
 - A clean BAM file and its index, suitable for variant discovery analyses.
