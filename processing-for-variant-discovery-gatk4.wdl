@@ -14,10 +14,11 @@
 ## Output :
 ## - A clean BAM file and its index, suitable for variant discovery analyses.
 ##
-## Software version requirements (see recommended dockers in inputs JSON)
+## Software version requirements 
 ## - GATK 4 or later
-## - Picard (see gotc docker)
-## - Samtools (see gotc docker)
+## - BWA 0.7.15-r1140
+## - Picard 2.16.0-SNAPSHOT
+## - Samtools 1.3.1 (using htslib 1.3.1)
 ## - Python 2.7
 ##
 ## Cromwell version support 
