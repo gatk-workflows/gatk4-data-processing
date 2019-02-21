@@ -16,7 +16,7 @@ The processing-for-variant-discovery-gatk4 WDL pipeline implements data pre-proc
   - all reads must have an RG tag
 - Reference index files must be in the same directory as source (e.g. reference.fasta.fai in the same directory as reference.fasta)
 
-#### Outputs : 
+#### Outputs: 
 - A clean BAM file and its index, suitable for variant discovery analyses.
 
 ### Software version requirements :
