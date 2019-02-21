@@ -6,7 +6,7 @@ Workflows for processing high-throughput sequencing data for variant discovery w
 ### processing-for-variant-discovery-gatk4 :
 The processing-for-variant-discovery-gatk4 WDL pipeline implements data pre-processing according to the GATK Best Practices.  
 
-#### Requirements/expectations :
+#### Requirements/expectations:
 - Pair-end sequencing data in unmapped BAM (uBAM) format
 - One or more read groups, one per uBAM file, all belonging to a single sample (SM)
 - Input uBAM files must additionally comply with the following requirements:
