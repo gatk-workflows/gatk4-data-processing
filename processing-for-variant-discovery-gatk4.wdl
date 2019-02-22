@@ -1,7 +1,6 @@
-## Copyright Broad Institute, 2018
+## Copyright Broad Institute, 2019
 ## 
-## This WDL pipeline implements data pre-processing according to the GATK Best Practices 
-## (June 2016).  
+## This WDL pipeline implements data pre-processing according to the GATK Best Practices.  
 ##
 ## Requirements/expectations :
 ## - Pair-end sequencing data in unmapped BAM (uBAM) format
@@ -15,14 +14,15 @@
 ## Output :
 ## - A clean BAM file and its index, suitable for variant discovery analyses.
 ##
-## Software version requirements (see recommended dockers in inputs JSON)
+## Software version requirements 
 ## - GATK 4 or later
-## - Picard (see gotc docker)
-## - Samtools (see gotc docker)
+## - BWA 0.7.15-r1140
+## - Picard 2.16.0-SNAPSHOT
+## - Samtools 1.3.1 (using htslib 1.3.1)
 ## - Python 2.7
 ##
 ## Cromwell version support 
-## - Successfully tested on v32
+## - Successfully tested on v37
 ## - Does not work on versions < v23 due to output syntax
 ##
 ## Runtime parameters are optimized for Broad's Google Cloud Platform implementation.
@@ -47,29 +47,36 @@ workflow PreProcessingForVariantDiscovery_GATK4 {
   File ref_fasta_index
   File ref_dict
 
-  String bwa_commandline
-  Int compression_level
-  
   File dbSNP_vcf
   File dbSNP_vcf_index
   Array[File] known_indels_sites_VCFs
   Array[File] known_indels_sites_indices
 
-  String gotc_docker
-  String gatk_docker
-  String python_docker
-
-  String gotc_path
-  String gatk_path
+  String? bwa_commandline_override
+  String bwa_commandline = select_first([bwa_commandline_override, "bwa mem -K 100000000 -p -v 3 -t 16 -Y $bash_ref_fasta"]) 
+  Int compression_level
   
+  String? gatk_docker_override
+  String gatk_docker = select_first([gatk_docker_override, "broadinstitute/gatk:4.1.0.0"])
+  String? gatk_path_override
+  String gatk_path = select_first([gatk_path_override, "/gatk/gatk"])
+
+  String? gotc_docker_override
+  String gotc_docker = select_first([gotc_docker_override, "broadinstitute/genomes-in-the-cloud:2.3.1-1512499786"])
+  String? gotc_path_override
+  String gotc_path = select_first([gotc_path_override, "/usr/gitc/"])
+
+  String? python_docker_override
+  String python_docker = select_first([python_docker_override, "python:2.7"])  
+
   Int flowcell_small_disk
   Int flowcell_medium_disk
   Int agg_small_disk
   Int agg_medium_disk
   Int agg_large_disk
 
-  Int preemptible_tries
-  Int agg_preemptible_tries
+  String? preemptible_tries_override
+  Int preemptible_tries = select_first([preemptible_tries_override, "3"])
 
   String base_file_name = sample_name + "." + ref_name
 
@@ -138,7 +145,7 @@ workflow PreProcessingForVariantDiscovery_GATK4 {
       gatk_path = gatk_path,
       disk_size = agg_large_disk,
       compression_level = compression_level,
-      preemptible_tries = agg_preemptible_tries
+      preemptible_tries = preemptible_tries
   }
 
   # Sort aggregated+deduped BAM file and fix tags
@@ -183,7 +190,7 @@ workflow PreProcessingForVariantDiscovery_GATK4 {
         docker_image = gatk_docker,
         gatk_path = gatk_path,
         disk_size = agg_small_disk,
-        preemptible_tries = agg_preemptible_tries
+        preemptible_tries = preemptible_tries
     }  
   }  
   
@@ -214,7 +221,7 @@ workflow PreProcessingForVariantDiscovery_GATK4 {
         docker_image = gatk_docker,
         gatk_path = gatk_path,
         disk_size = agg_small_disk,
-        preemptible_tries = agg_preemptible_tries
+        preemptible_tries = preemptible_tries
     }
   } 
 
@@ -226,7 +233,7 @@ workflow PreProcessingForVariantDiscovery_GATK4 {
       docker_image = gatk_docker,
       gatk_path = gatk_path,
       disk_size = agg_large_disk,
-      preemptible_tries = agg_preemptible_tries,
+      preemptible_tries = preemptible_tries,
       compression_level = compression_level
   }
 
@@ -603,7 +610,7 @@ task GatherBqsrReports {
       GatherBQSRReports \
       -I ${sep=' -I ' input_bqsr_reports} \
       -O ${output_report_filename}
-    }
+  }
   runtime {
     preemptible: preemptible_tries
     docker: docker_image
@@ -679,7 +686,7 @@ task GatherBamFiles {
       --OUTPUT ${output_bam_basename}.bam \
       --CREATE_INDEX true \
       --CREATE_MD5_FILE true
-    }
+  }
   runtime {
     preemptible: preemptible_tries
     docker: docker_image
