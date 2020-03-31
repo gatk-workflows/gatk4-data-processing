@@ -245,7 +245,7 @@ workflow PreProcessingForVariantDiscovery_GATK4 {
 # Get version of BWA
 task GetBwaVersion {
   input {
-    Float mem_size_gb = 1
+    Int mem_size_gb = 1
     Int preemptible_tries
     String docker_image
     String bwa_path
@@ -287,7 +287,7 @@ task SamToFastqAndBwaMem {
     File ref_pac
     File ref_sa
 
-    Float mem_size_gb = 14
+    Int mem_size_gb = 14
     String num_cpu = 16
 
     Int compression_level
@@ -298,7 +298,7 @@ task SamToFastqAndBwaMem {
     String bwa_path
     String gotc_path
   }
-  Float command_mem_gb = mem_size_gb/2
+  Int command_mem_gb = mem_size_gb/2
 
   command {
     set -o pipefail
@@ -307,7 +307,7 @@ task SamToFastqAndBwaMem {
     # set the bash variable needed for the command-line
     bash_ref_fasta=~{ref_fasta}
 
-    java -Dsamjdk.compression_level=~{compression_level} -Xmx~{command_mem_gb}G -jar ~{gotc_path}picard.jar \
+    java -Dsamjdk.compression_level=~{compression_level} -Xms~{command_mem_gb}G -jar ~{gotc_path}picard.jar \
     SamToFastq \
     INPUT=~{input_bam} \
     FASTQ=/dev/stdout \
@@ -346,12 +346,12 @@ task MergeBamAlignment {
     Int compression_level
     Int preemptible_tries
     Int disk_size
-    Float mem_size_gb = "3.5"
+    Int mem_size_gb = "4"
 
     String docker_image
     String gatk_path
   }
-  Float command_mem_gb = mem_size_gb - 1
+  Int command_mem_gb = mem_size_gb - 1
 
   command {
     # set the bash variable needed for the command-line
@@ -405,13 +405,13 @@ task SortAndFixTags {
     Int compression_level
     Int preemptible_tries
     Int disk_size
-    Float mem_size_gb = 10
+    Int mem_size_gb = 10
 
     String docker_image
     String gatk_path
   }
-    Float command_mem_gb_sort = mem_size_gb - 1
-    Float command_mem_gb_fix = (mem_size_gb - 1)/10
+    Int command_mem_gb_sort = mem_size_gb - 1
+    Int command_mem_gb_fix = ceil((mem_size_gb - 1)/10)
 
   command {
     set -o pipefail
@@ -455,12 +455,12 @@ task MarkDuplicates {
     Int compression_level
     Int preemptible_tries
     Int disk_size
-    Float mem_size_gb = 7
+    Int mem_size_gb = 7
 
     String docker_image
     String gatk_path
   }
-    Float command_mem_gb = mem_size_gb - 2
+    Int command_mem_gb = mem_size_gb - 2
  # Task is assuming query-sorted input so that the Secondary and Supplementary reads get marked correctly.
  # This works because the output of BWA is query-grouped and therefore, so is the output of MergeBamAlignment.
  # While query-grouped isn't actually query-sorted, it's good enough for MarkDuplicates with ASSUME_SORT_ORDER="queryname"
@@ -493,7 +493,7 @@ task CreateSequenceGroupingTSV {
     File ref_dict  
   
     Int preemptible_tries
-    Float mem_size_gb = 2
+    Int mem_size_gb = 2
 
     String docker_image
   }
@@ -564,15 +564,15 @@ task BaseRecalibrator {
   
     Int preemptible_tries
     Int disk_size
-    Float mem_size_gb = 6
+    Int mem_size_gb = 6
 
     String docker_image
     String gatk_path
   }
-  Float command_mem_gb = mem_size_gb - 2
+  Int command_mem_gb = mem_size_gb - 2
 
   command { 
-    ~{gatk_path} --java-options "-Xmx~{command_mem_gb}" \
+    ~{gatk_path} --java-options "-Xms~{command_mem_gb}G" \
       BaseRecalibrator \
       -R ~{ref_fasta} \
       -I ~{input_bam} \
@@ -602,15 +602,15 @@ task GatherBqsrReports {
 
    Int preemptible_tries
    Int disk_size
-   Float mem_size_gb = 3.5
+   Int mem_size_gb = 4
 
    String docker_image
    String gatk_path
   }
-  Float command_mem_gb = mem_size_gb - 0.5
+  Int command_mem_gb = mem_size_gb - 1
 
   command {
-    ~{gatk_path} --java-options "-Xmx~{command_mem_gb}G" \
+    ~{gatk_path} --java-options "-Xms~{command_mem_gb}G" \
       GatherBQSRReports \
       -I ~{sep=' -I ' input_bqsr_reports} \
       -O ~{output_report_filename}
@@ -640,15 +640,15 @@ task ApplyBQSR {
 
     Int preemptible_tries
     Int disk_size 
-    Float mem_size_gb = 3.5
+    Int mem_size_gb = 4
 
     String docker_image
     String gatk_path
   }
-  Float command_mem_gb = mem_size_gb - 0.5
+  Int command_mem_gb = mem_size_gb - 1
 
   command {  
-    ~{gatk_path} --java-options "-Xmx~{command_mem_gb}G" \
+    ~{gatk_path} --java-options "-Xms~{command_mem_gb}G" \
       ApplyBQSR \
       -R ~{ref_fasta} \
       -I ~{input_bam} \
@@ -680,15 +680,15 @@ task GatherBamFiles {
     Int compression_level
     Int preemptible_tries
     Int disk_size
-    Float mem_size_gb = 3
+    Int mem_size_gb = 3
 
     String docker_image
     String gatk_path
   }
-  Float command_mem_gb = mem_size_gb - 1
+  Int command_mem_gb = mem_size_gb - 1
 
   command {
-    ~{gatk_path} --java-options "-Dsamjdk.compression_level=~{compression_level} -Xmx~{command_mem_gb}G" \
+    ~{gatk_path} --java-options "-Dsamjdk.compression_level=~{compression_level} -Xms~{command_mem_gb}G" \
       GatherBamFiles \
       --INPUT ~{sep=' --INPUT ' input_bams} \
       --OUTPUT ~{output_bam_basename}.bam \
