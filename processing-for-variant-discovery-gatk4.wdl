@@ -57,7 +57,7 @@ workflow PreProcessingForVariantDiscovery_GATK4 {
     String bwa_commandline = "bwa mem -K 100000000 -p -v 3 -t 16 -Y $bash_ref_fasta"
     Int compression_level = 5
   
-    String gatk_docker = "broadinstitute/gatk:4.1.0.0"
+    String gatk_docker = "broadinstitute/gatk:4.1.6.0"
     String gatk_path = "/gatk/gatk"
     String gotc_docker = "broadinstitute/genomes-in-the-cloud:2.3.1-1512499786"
     String gotc_path = "/usr/gitc/"
@@ -261,7 +261,7 @@ task GetBwaVersion {
   runtime {
     preemptible: preemptible_tries
     docker: docker_image
-    memory: mem_size_gb + " GB"
+    memory: mem_size_gb + " GiB"
   }
   output {
     String version = read_string(stdout())
@@ -321,7 +321,7 @@ task SamToFastqAndBwaMem {
   runtime {
     preemptible: preemptible_tries
     docker: docker_image
-    memory: mem_size_gb + " GB"
+    memory: mem_size_gb + " GiB"
     cpu: num_cpu
     disks: "local-disk " + disk_size + " HDD"
   }
@@ -385,7 +385,7 @@ task MergeBamAlignment {
   runtime {
     preemptible: preemptible_tries
     docker: docker_image
-    memory: mem_size_gb + " GB"
+    memory: mem_size_gb + " GiB"
     disks: "local-disk " + disk_size + " HDD"
   }
   output {
@@ -435,7 +435,7 @@ task SortAndFixTags {
   runtime {
     preemptible: preemptible_tries
     docker: docker_image
-    memory: mem_size_gb
+    memory: mem_size_gb + " GiB"
     disks: "local-disk " + disk_size + " HDD"
   }
   output {
@@ -478,7 +478,7 @@ task MarkDuplicates {
   runtime {
     preemptible: preemptible_tries
     docker: docker_image
-    memory: mem_size_gb
+    memory: mem_size_gb + " GiB"
     disks: "local-disk " + disk_size + " HDD"
   }
   output {
@@ -539,7 +539,7 @@ task CreateSequenceGroupingTSV {
   runtime {
     preemptible: preemptible_tries
     docker: docker_image
-    memory: mem_size_gb + " GB"
+    memory: mem_size_gb + " GiB"
   }
   output {
     Array[Array[String]] sequence_grouping = read_tsv("sequence_grouping.txt")
@@ -585,7 +585,7 @@ task BaseRecalibrator {
   runtime {
     preemptible: preemptible_tries
     docker: docker_image
-    memory: mem_size_gb
+    memory: mem_size_gb + " GiB"
     disks: "local-disk " + disk_size + " HDD"
   }
   output {
@@ -618,7 +618,7 @@ task GatherBqsrReports {
   runtime {
     preemptible: preemptible_tries
     docker: docker_image
-    memory: mem_size_gb
+    memory: mem_size_gb + " GiB"
     disks: "local-disk " + disk_size + " HDD"
   }
   output {
@@ -663,7 +663,7 @@ task ApplyBQSR {
   runtime {
     preemptible: preemptible_tries
     docker: docker_image
-    memory: mem_size_gb
+    memory: mem_size_gb + " GiB"
     disks: "local-disk " + disk_size + " HDD"
   }
   output {
@@ -698,7 +698,7 @@ task GatherBamFiles {
   runtime {
     preemptible: preemptible_tries
     docker: docker_image
-    memory: mem_size_gb
+    memory: mem_size_gb + " GiB"
     disks: "local-disk " + disk_size + " HDD"
   }
   output {
