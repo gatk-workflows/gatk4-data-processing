@@ -707,4 +707,3 @@ task GatherBamFiles {
     File output_bam_md5 = "~{output_bam_basename}.bam.md5"
   }
 }
-
