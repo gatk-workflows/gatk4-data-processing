@@ -298,7 +298,7 @@ task SamToFastqAndBwaMem {
     String bwa_path
     String gotc_path
   }
-  Int command_mem_gb = ceil(mem_size_gb)/2
+  Int command_mem_gb = ceil(mem_size_gb/2)
 
   command {
     set -o pipefail
