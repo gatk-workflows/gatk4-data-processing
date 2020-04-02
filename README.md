@@ -26,7 +26,7 @@ The processing-for-variant-discovery-gatk4 WDL pipeline implements data pre-proc
 - Samtools 1.3.1 (using htslib 1.3.1)
 - Python 2.7
 - Cromwell version support 
-  - Successfully tested on v37 
+  - Successfully tested on v49 
   - Does not work on versions < v23 due to output syntax
   
 ### Important Notes :
