@@ -4,7 +4,10 @@
 Workflows for processing high-throughput sequencing data for variant discovery with GATK4 and related tools.
 
 ### processing-for-variant-discovery-gatk4 :
-The processing-for-variant-discovery-gatk4 WDL pipeline implements data pre-processing according to the GATK Best Practices.  
+The processing-for-variant-discovery-gatk4 WDL pipeline implements data pre-processing according to the [GATK Best Practices](https://gatk.broadinstitute.org/hc/en-us/articles/360035535912). The workflow takes as input an unmapped BAM list file (text file containing paths to unmapped bam files) to perform preprocessing tasks such as mapping, marking duplicates, and base recalibration. It produces a single BAM file and its index suitable for [variant discovery analysis](https://gatk.broadinstitute.org/hc/en-us/articles/360035535932-Germline-short-variant-discovery-SNPs-Indels-) using tools such as Haplotypecaller.
+
+- If you are starting with FASTQ files visit the [seq-format-conversion](https://github.com/gatk-workflows/seq-format-conversion) repository for worklfows to convert FASTQs to UBAMS.
+- The BAM outputs can be used to perform a varity of other annalysis like somatic short variant discovery, germline short variant discovery, or germline copy number variant discovery. Visit the GATK Best Practices documentation to determine what to do next with the BAM files. 
 
 #### Requirements/expectations:
 - Pair-end sequencing data in unmapped BAM (uBAM) format
@@ -26,8 +29,7 @@ The processing-for-variant-discovery-gatk4 WDL pipeline implements data pre-proc
 - Samtools 1.3.1 (using htslib 1.3.1)
 - Python 2.7
 - Cromwell version support 
-  - Successfully tested on v49 
-  - Does not work on versions < v23 due to output syntax
+  - Successfully tested on v52 
   
 ### Important Notes :
 - Runtime parameters are optimized for Broad's Google Cloud Platform implementation.
