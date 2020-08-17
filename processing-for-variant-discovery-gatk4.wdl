@@ -57,7 +57,7 @@ workflow PreProcessingForVariantDiscovery_GATK4 {
     String bwa_commandline = "bwa mem -K 100000000 -p -v 3 -t 16 -Y $bash_ref_fasta"
     Int compression_level = 5
   
-    String gatk_docker = "broadinstitute/gatk:4.1.6.0"
+    String gatk_docker = "broadinstitute/gatk:4.1.8.1"
     String gatk_path = "/gatk/gatk"
     String gotc_docker = "broadinstitute/genomes-in-the-cloud:2.3.1-1512499786"
     String gotc_path = "/usr/gitc/"
