@@ -6,8 +6,8 @@ Workflows for processing high-throughput sequencing data for variant discovery w
 ### processing-for-variant-discovery-gatk4 :
 The processing-for-variant-discovery-gatk4 WDL pipeline implements data pre-processing according to the [GATK Best Practices](https://gatk.broadinstitute.org/hc/en-us/articles/360035535912). The workflow takes as input an unmapped BAM list file (text file containing paths to unmapped bam files) to perform preprocessing tasks such as mapping, marking duplicates, and base recalibration. It produces a single BAM file and its index suitable for [variant discovery analysis](https://gatk.broadinstitute.org/hc/en-us/articles/360035535932-Germline-short-variant-discovery-SNPs-Indels-) using tools such as Haplotypecaller.
 
-- If you are starting with FASTQ files visit the [seq-format-conversion](https://github.com/gatk-workflows/seq-format-conversion) repository for worklfows to convert FASTQs to UBAMS.
-- The BAM outputs can be used to perform a varity of other annalysis like somatic short variant discovery, germline short variant discovery, or germline copy number variant discovery. Visit the GATK Best Practices documentation to determine what to do next with the BAM files. 
+- If you are starting with FASTQ files visit the [seq-format-conversion](https://github.com/gatk-workflows/seq-format-conversion) repository for worklfows to convert FASTQs to unmapped BAMS.
+- The BAM output from processing-for-variant-discovery-gatk4 can be used to perform a varity of other annalysis like somatic short variant discovery, germline short variant discovery, or germline copy number variant discovery. Visit the GATK Best Practices documentation to determine what to do next with the BAM files. 
 
 #### Requirements/expectations:
 - Pair-end sequencing data in unmapped BAM (uBAM) format
