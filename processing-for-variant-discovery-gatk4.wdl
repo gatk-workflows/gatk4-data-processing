@@ -48,7 +48,12 @@ workflow PreProcessingForVariantDiscovery_GATK4 {
     File ref_fasta
     File ref_fasta_index
     File ref_dict
-
+    File? ref_alt
+    File ref_sa 
+    File ref_ann
+    File ref_bwt
+    File ref_pac
+    File ref_amb
     File dbSNP_vcf
     File dbSNP_vcf_index
     Array[File] known_indels_sites_VCFs
@@ -99,6 +104,12 @@ workflow PreProcessingForVariantDiscovery_GATK4 {
         ref_fasta = ref_fasta,
         ref_fasta_index = ref_fasta_index,
         ref_dict = ref_dict,
+        ref_alt = ref_alt,
+        ref_sa = ref_sa,
+        ref_ann = ref_ann,
+        ref_bwt = ref_bwt,
+        ref_pac = ref_pac,
+        ref_amb = ref_amb,
         docker_image = gotc_docker,
         bwa_path = gotc_path,
         gotc_path = gotc_path,
