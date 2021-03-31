@@ -1,6 +1,6 @@
 version 1.0
 
-## Copyright Broad Institute, 2019
+## Copyright Broad Institute, 2021
 ## 
 ## This WDL pipeline implements data pre-processing according to the GATK Best Practices.  
 ##
@@ -24,8 +24,7 @@ version 1.0
 ## - Python 2.7
 ##
 ## Cromwell version support 
-## - Successfully tested on v37
-## - Does not work on versions < v23 due to output syntax
+## - Successfully tested on v59
 ##
 ## Runtime parameters are optimized for Broad's Google Cloud Platform implementation.
 ##
@@ -62,9 +61,9 @@ workflow PreProcessingForVariantDiscovery_GATK4 {
     String bwa_commandline = "bwa mem -K 100000000 -p -v 3 -t 16 -Y $bash_ref_fasta"
     Int compression_level = 5
   
-    String gatk_docker = "broadinstitute/gatk:4.1.8.1"
+    String gatk_docker = "us.gcr.io/broad-gatk/gatk:4.2.0.0"
     String gatk_path = "/gatk/gatk"
-    String gotc_docker = "broadinstitute/genomes-in-the-cloud:2.3.1-1512499786"
+    String gotc_docker = "us.gcr.io/broad-gotc-prod/genomes-in-the-cloud:2.4.7-1603303710"
     String gotc_path = "/usr/gitc/"
     String python_docker = "python:2.7"  
 
