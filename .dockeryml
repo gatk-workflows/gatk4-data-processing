@@ -1,0 +1,8 @@
+version: 1.2
+workflows:
+   - name: processing-for-variant-discovery-gatk4
+     subclass: WDL
+     primaryDescriptorPath: /processing-for-variant-discovery-gatk4.wdl
+     testParameterFiles:
+     - /processing-for-variant-discovery-gatk4.hg38.wgs.inputs.json
+     - /processing-for-variant-discovery-gatk4.b37.wgs.inputs.json
