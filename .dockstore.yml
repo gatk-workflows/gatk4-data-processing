@@ -1,7 +1,7 @@
 
 version: 1.2
 workflows:
-   - name: processing-for-variant-discovery-gatk4
+   - name: processing-for-variant-discovery-gatk4.wdl
      subclass: WDL
      primaryDescriptorPath: /processing-for-variant-discovery-gatk4
      testParameterFiles:
