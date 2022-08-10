@@ -124,7 +124,7 @@ workflow PreProcessingForVariantDiscovery_GATK4 {
         bwa_commandline = bwa_commandline,
         bwa_version = GetBwaVersion.version,
         aligned_bam = SamToFastqAndBwaMem.output_bam,
-        output_bam_basename = bam_basename + ".aligned.unsorted",
+        output_bam_basename = bam_basename + ".aligned.queryname",
         ref_fasta = ref_fasta,
         ref_fasta_index = ref_fasta_index,
         ref_dict = ref_dict,
@@ -142,7 +142,7 @@ workflow PreProcessingForVariantDiscovery_GATK4 {
   call MarkDuplicates {
     input:
       input_bams = MergeBamAlignment.output_bam,
-      output_bam_basename = base_file_name + ".aligned.unsorted.duplicates_marked",
+      output_bam_basename = base_file_name + ".aligned.queryname.duplicates_marked",
       metrics_filename = base_file_name + ".duplicate_metrics",
       docker_image = gatk_docker,
       gatk_path = gatk_path,
@@ -376,7 +376,7 @@ task MergeBamAlignment {
       --OUTPUT ~{output_bam_basename}.bam \
       --REFERENCE_SEQUENCE ~{ref_fasta} \
       --PAIRED_RUN true \
-      --SORT_ORDER "unsorted" \
+      --SORT_ORDER "queryname" \
       --IS_BISULFITE_SEQUENCE false \
       --ALIGNED_READS_ONLY false \
       --CLIP_ADAPTERS false \
